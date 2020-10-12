@@ -1,6 +1,6 @@
+#include "address.hh"
 #include "socket.hh"
 #include "util.hh"
-#include "address.hh"
 
 #include <cstdlib>
 #include <iostream>

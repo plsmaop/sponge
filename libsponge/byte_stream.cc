@@ -1,6 +1,7 @@
-#include <stdexcept>
-#include <iostream>
 #include "byte_stream.hh"
+
+#include <iostream>
+#include <stdexcept>
 
 // Dummy implementation of a flow-controlled in-memory byte stream.
 
@@ -67,9 +68,7 @@ bool ByteStream::buffer_empty() const { return buffer_size() == 0; }
 
 bool ByteStream::eof() const { return _input_end && buffer_empty(); }
 
-size_t ByteStream::bytes_written() const {
-    return _producer_index;
-}
+size_t ByteStream::bytes_written() const { return _producer_index; }
 
 size_t ByteStream::bytes_read() const { return _consumer_index; }
 
