@@ -33,9 +33,9 @@ string ByteStream::peek_output(const size_t len) const {
         throw std::runtime_error("len too long");
     }
 
-    std::string s;
+    std::string s(len, ' ');
     for (auto i = _consumer_index; i < _consumer_index + len; ++i) {
-        s += _buf[i % _capacity];
+        s[i - _consumer_index] = _buf[i % _capacity];
     }
     return s;
 }
