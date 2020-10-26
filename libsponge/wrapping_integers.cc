@@ -14,8 +14,9 @@ using namespace std;
 //! \param n The input absolute 64-bit sequence number
 //! \param isn The initial sequence number
 WrappingInt32 wrap(uint64_t n, WrappingInt32 isn) {
-    DUMMY_CODE(n, isn);
-    return WrappingInt32{0};
+    auto isn_raw = uint64_t(isn.raw_value());
+    uint32_t wrap_num = (n+isn_raw) % (uint64_t(1) << 32);
+    return WrappingInt32{wrap_num};
 }
 
 //! Transform a WrappingInt32 into an "absolute" 64-bit sequence number (zero-indexed)
