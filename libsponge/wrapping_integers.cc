@@ -1,4 +1,5 @@
 #include "wrapping_integers.hh"
+#include <iostream>
 
 // Dummy implementation of a 32-bit wrapping integer
 
@@ -14,8 +15,8 @@ using namespace std;
 //! \param n The input absolute 64-bit sequence number
 //! \param isn The initial sequence number
 WrappingInt32 wrap(uint64_t n, WrappingInt32 isn) {
-    auto isn_raw = uint64_t(isn.raw_value());
-    uint32_t wrap_num = (n+isn_raw) % (uint64_t(1) << 32);
+    auto isn_raw = static_cast<uint64_t>(isn.raw_value());
+    uint32_t wrap_num = (n + isn_raw) % (1ul << 32);
     return WrappingInt32{wrap_num};
 }
 
@@ -30,6 +31,34 @@ WrappingInt32 wrap(uint64_t n, WrappingInt32 isn) {
 //! and the other stream runs from the remote TCPSender to the local TCPReceiver and
 //! has a different ISN.
 uint64_t unwrap(WrappingInt32 n, WrappingInt32 isn, uint64_t checkpoint) {
-    DUMMY_CODE(n, isn, checkpoint);
-    return {};
+    auto raw_n = static_cast<uint64_t>(n.raw_value());
+    auto raw_isn = static_cast<uint64_t>(isn.raw_value());
+    auto mod = 1ul << 32;
+    if (raw_n < raw_isn) {
+        raw_n += mod;
+    }
+
+    auto gap = raw_n - raw_isn;
+    std::cout << "gap: " << gap << std::endl;
+
+    auto mutiply = checkpoint / mod;
+    auto remainder = checkpoint % mod;
+
+    if (mutiply == 0 && remainder == 0) {
+        return gap;
+    }
+
+    if (gap > remainder) {
+        if (gap - remainder > remainder + mod - gap) {
+            mutiply--;
+        }
+    }
+
+    if (gap < remainder) {
+        if (remainder - gap > gap + mod - remainder) {
+            mutiply++;
+        }
+    }
+
+    return gap + mutiply * mod;
 }
