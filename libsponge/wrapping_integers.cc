@@ -1,5 +1,4 @@
 #include "wrapping_integers.hh"
-#include <iostream>
 
 // Dummy implementation of a 32-bit wrapping integer
 
@@ -38,12 +37,10 @@ uint64_t unwrap(WrappingInt32 n, WrappingInt32 isn, uint64_t checkpoint) {
         raw_n += mod;
     }
 
-    auto gap = raw_n - raw_isn;
-    std::cout << "gap: " << gap << std::endl;
-
     auto mutiply = checkpoint / mod;
     auto remainder = checkpoint % mod;
 
+    auto gap = raw_n - raw_isn;
     if (mutiply == 0 && remainder == 0) {
         return gap;
     }

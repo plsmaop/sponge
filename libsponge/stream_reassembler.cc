@@ -26,7 +26,6 @@ StreamReassembler::StreamReassembler(const size_t capacity)
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
-
 #if DEBUG
     for (const auto &[ind, str, _] : _unassembledStr) {
         std::cout << ind << ":" << str << " <- ";
@@ -51,7 +50,8 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
         }
 
 #if DEBUG
-        std::cout << "Writen: " << data.substr(_nextInd - startInd) << ", _nextInd become: " << _nextInd + writtenLen << std::endl;
+        std::cout << "Writen: " << data.substr(_nextInd - startInd) << ", _nextInd become: " << _nextInd + writtenLen
+                  << std::endl;
 #endif
         _nextInd += writtenLen;
         if (eof) {
@@ -86,7 +86,8 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
                 }
 
 #if DEBUG
-                std::cout << "Writen: " << str.substr(_nextInd - ind) << ", _nextInd become: " << _nextInd + writtenLen << std::endl;
+                std::cout << "Writen: " << str.substr(_nextInd - ind) << ", _nextInd become: " << _nextInd + writtenLen
+                          << std::endl;
 #endif
 
                 _nextInd += writtenLen;
@@ -150,8 +151,8 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
         auto prevStrLen = prevStr.length();
         if (prevInd + prevStrLen >= startInd && startInd + data.length() >= ind) {
             // concat prev + data + cur
-            prevStr = prevStr + data.substr(prevInd + prevStrLen - startInd) +
-                      str.substr(startInd + data.length() - ind);
+            prevStr =
+                prevStr + data.substr(prevInd + prevStrLen - startInd) + str.substr(startInd + data.length() - ind);
             _unassembledSize += (ind - prevInd - prevStrLen);
             prevIsEOF = isEOF;
             _unassembledStr.erase(it);
