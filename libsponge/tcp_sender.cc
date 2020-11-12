@@ -56,9 +56,12 @@ TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const s
 uint64_t TCPSender::bytes_in_flight() const { return _bytes_in_flight; }
 
 void TCPSender::fill_window() {
+    if (_cur_window == 0) {
+        return;
+    }
+
     uint64_t seg_size = static_cast<uint64_t>(_cur_window);
     seg_size = seg_size < TCPConfig::MAX_PAYLOAD_SIZE ? seg_size : TCPConfig::MAX_PAYLOAD_SIZE;
-    seg_size = seg_size > 0 ? seg_size : 1;
 
     TCPSegment seg;
     seg.header().seqno = next_seqno();
@@ -85,12 +88,16 @@ void TCPSender::fill_window() {
     _bytes_in_flight += static_cast<uint64_t>(seg.length_in_sequence_space());
     _next_seqno += static_cast<uint64_t>(seg.length_in_sequence_space());
     _timer.set_timeout(_initial_retransmission_timeout);
+    _cur_window -= static_cast<uint64_t>(seg.length_in_sequence_space());
 }
 
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
     _cur_window = window_size;
+    if (window_size == 0) {
+        _cur_window = 1;
+    }
 
     auto checkpoint = _stream.bytes_read();
     auto abs_ackno = unwrap(ackno, _isn, checkpoint);
@@ -110,7 +117,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
         }
 
         if (abs_seqno <= abs_ackno && abs_ackno < abs_seqno + seg_size) {
-            _cur_window = abs_seqno + seg_size - abs_ackno;
+           //  _cur_window = abs_seqno + seg_size - abs_ackno;
         }
 
         break;
@@ -129,8 +136,6 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
 
         _consecutive_retransmissions = 0;
     }
-
-    fill_window();
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
@@ -161,10 +166,10 @@ void TCPSender::_retransmit() {
 
     auto rto = _timer.get_timout();
     // (b)
-    if (_cur_window != 0) {
+    // if (_cur_window != 0) {
         ++_consecutive_retransmissions;
         rto *= 2;
-    }
+    // }
 
     // (c) reset RTO
     _timer.stop();
