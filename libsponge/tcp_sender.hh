@@ -56,7 +56,14 @@ class TCPSender {
 
     uint16_t _cur_window = 1;
 
+
     uint64_t _bytes_in_flight = 0;
+
+    bool _is_close = false;
+
+    bool _recv_zero = false;
+
+    bool _recv_zero_used = false;
 
     void _retransmit();
 
