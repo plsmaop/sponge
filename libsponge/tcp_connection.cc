@@ -61,9 +61,13 @@ void TCPConnection::tick(const size_t ms_since_last_tick) {
 }
 
 void TCPConnection::end_input_stream() {
-    if (!active()) {
+    if (!active() || !_receiver.stream_out().eof() || !(_sender.stream_in().eof() && _sender.bytes_in_flight() == 0)) {
         return;
     }
+
+    // Prereq #4
+    // Option A
+    
 }
 
 void TCPConnection::connect() { _send(false); }
