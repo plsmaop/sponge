@@ -57,7 +57,8 @@ void Timer::stop() {
 TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const std::optional<WrappingInt32> fixed_isn)
     : _isn(fixed_isn.value_or(WrappingInt32{random_device()()}))
     , _initial_retransmission_timeout{retx_timeout}
-    , _stream(capacity), _timer() { }
+    , _stream(capacity)
+    , _timer() {}
 
 uint64_t TCPSender::bytes_in_flight() const { return _bytes_in_flight; }
 
@@ -80,9 +81,9 @@ void TCPSender::fill_window() {
 
         auto payload_size = win_size < _stream.buffer_size() ? win_size : _stream.buffer_size();
         payload_size = payload_size < TCPConfig::MAX_PAYLOAD_SIZE ? payload_size : TCPConfig::MAX_PAYLOAD_SIZE;
-        seg.payload() = Buffer(std::move(_stream.read(payload_size)));;
+        seg.payload() = Buffer(std::move(_stream.read(payload_size)));
         win_size -= payload_size;
-        
+
         if (_stream.eof() && win_size > 0) {
             seg.header().fin = true;
             _is_close = true;
@@ -114,7 +115,11 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
 
     auto checkpoint = _stream.bytes_read();
     auto abs_ackno = unwrap(ackno, _isn, checkpoint);
- 
+    if (abs_ackno > _next_seqno) {
+        // Impossible ackno (beyond next seqno) is ignored
+        return;
+    }
+
     std::vector<decltype(_outstanding.begin())> itToErase;
     for (auto it = _outstanding.begin(), end = _outstanding.end(); it != end; ++it) {
         auto abs_seqno = unwrap(it->header().seqno, _isn, checkpoint);
@@ -175,7 +180,6 @@ void TCPSender::send_empty_segment() {
 }
 
 void TCPSender::_retransmit() {
-
 #if DEBUG
     cout << "TIMEOUT, RETRANSMIT\n";
 #endif

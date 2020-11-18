@@ -7,9 +7,8 @@
 #include "wrapping_integers.hh"
 
 #include <functional>
-#include <queue>
 #include <list>
-#include <functional>
+#include <queue>
 
 class Timer {
   private:

@@ -21,7 +21,7 @@ size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_b
 
 size_t TCPConnection::time_since_last_segment_received() const { return {}; }
 
-void TCPConnection::segment_received(const TCPSegment &seg) { 
+void TCPConnection::segment_received(const TCPSegment &seg) {
     if (_is_conn_close) {
         return;
     }
@@ -50,7 +50,7 @@ size_t TCPConnection::write(const string &data) {
 
     auto written_bytes = _sender.stream_in().write(data);
     _send(false);
-    
+
     return written_bytes;
 }
 
@@ -66,9 +66,7 @@ void TCPConnection::end_input_stream() {
     }
 }
 
-void TCPConnection::connect() {
-    _send(false);
-}
+void TCPConnection::connect() { _send(false); }
 
 TCPConnection::~TCPConnection() {
     try {
@@ -99,8 +97,9 @@ void TCPConnection::_send(bool set_rst) {
     if (_receiver.ackno().has_value()) {
         seg.header().ack = true;
         seg.header().ackno = _receiver.ackno().value();
-        seg.header().win = _receiver.window_size() > static_cast<uint64_t>(numeric_limits<uint16_t>::max()) ? 
-            numeric_limits<uint16_t>::max() : static_cast<uint16_t>( _receiver.window_size());
+        seg.header().win = _receiver.window_size() > static_cast<uint64_t>(numeric_limits<uint16_t>::max())
+                               ? numeric_limits<uint16_t>::max()
+                               : static_cast<uint16_t>(_receiver.window_size());
     }
 
     if (set_rst || _sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
