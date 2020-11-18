@@ -19,7 +19,7 @@ size_t TCPConnection::bytes_in_flight() const { return _sender.bytes_in_flight()
 
 size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_bytes(); }
 
-size_t TCPConnection::time_since_last_segment_received() const { return {}; }
+size_t TCPConnection::time_since_last_segment_received() const { return _tick_time - _last_segment_received_time; }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
     if (_is_conn_close) {
@@ -27,7 +27,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     }
 
     if (seg.header().rst) {
-        _close_conn();
+        _abort_conn();
         return;
     }
 
@@ -38,6 +38,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 
     if (seg.length_in_sequence_space() > 0) {
         _send(false);
+        _last_segment_received_time = _tick_time;
     }
 }
 
@@ -56,18 +57,18 @@ size_t TCPConnection::write(const string &data) {
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) {
+    _tick_time += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
     _send(false);
+    _try_end_conn();
 }
 
 void TCPConnection::end_input_stream() {
-    if (!active() || !_receiver.stream_out().eof() || !(_sender.stream_in().eof() && _sender.bytes_in_flight() == 0)) {
-        return;
+    if (inbound_stream().eof() && !_sender.stream_in().eof()) {
+        _linger_after_streams_finish = false;
     }
 
-    // Prereq #4
-    // Option A
-    
+    _sender.stream_in().input_ended();
 }
 
 void TCPConnection::connect() { _send(false); }
@@ -85,7 +86,7 @@ TCPConnection::~TCPConnection() {
     }
 }
 
-void TCPConnection::_send(bool set_rst) {
+void TCPConnection::_send(const bool set_rst) {
     if (!active()) {
         return;
     }
@@ -108,7 +109,7 @@ void TCPConnection::_send(bool set_rst) {
 
     if (set_rst || _sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
         // set rst and abort coneection
-        _close_conn();
+        _abort_conn();
         seg.header().rst = true;
     }
 
@@ -116,9 +117,42 @@ void TCPConnection::_send(bool set_rst) {
 }
 
 void TCPConnection::_close_conn() {
-    _sender.stream_in().set_error();
     _sender.stream_in().end_input();
-    _receiver.stream_out().set_error();
     _receiver.stream_out().end_input();
     _is_conn_close = true;
+}
+
+void TCPConnection::_abort_conn() {
+    _sender.stream_in().set_error();
+    _receiver.stream_out().set_error();
+    _close_conn();
+}
+
+bool TCPConnection::_is_fin_acked() {
+    auto outbound = _sender.stream_in();
+    return outbound.eof() && _sender.next_seqno_absolute() == outbound.bytes_written() + 2 &&
+           _sender.bytes_in_flight() == 0;
+}
+
+void TCPConnection::_try_end_conn() {
+    if (!active()) {
+        return;
+    }
+
+    if (!inbound_stream().eof() || !_is_fin_acked()) {
+        return;
+    }
+
+    // Prereq #4
+    // Option A
+    if (_linger_after_streams_finish) {
+        if (time_since_last_segment_received() > 10 * _cfg.rt_timeout) {
+            _close_conn();
+        }
+
+        return;
+    }
+
+    // Option B
+    _close_conn();
 }
