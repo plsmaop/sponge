@@ -105,19 +105,18 @@ void TCPSender::fill_window() {
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
-    _cur_window = window_size;
-
-    _recv_zero = false;
-    if (window_size == 0) {
-        _recv_zero = true;
-        _recv_zero_used = false;
-    }
-
     auto checkpoint = _stream.bytes_read();
     auto abs_ackno = unwrap(ackno, _isn, checkpoint);
     if (abs_ackno > _next_seqno) {
         // Impossible ackno (beyond next seqno) is ignored
         return;
+    }
+
+    _cur_window = window_size;
+    _recv_zero = false;
+    if (window_size == 0) {
+        _recv_zero = true;
+        _recv_zero_used = false;
     }
 
     std::vector<decltype(_outstanding.begin())> itToErase;
