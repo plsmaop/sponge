@@ -3,7 +3,7 @@
 #include <iostream>
 #include <limits>
 
-#define DEBUG 0
+#define DEBUG 1
 
 // Dummy implementation of a TCP connection
 
@@ -33,11 +33,25 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         return;
     }
 
+#if DEBUG
+    cerr << "recv seg seqno: " << seg.header().seqno;
+#endif
+
     if (seg.header().ack) {
         _sender.ack_received(seg.header().ackno, seg.header().win);
+
+#if DEBUG
+    cerr << ", recv ackno: " << seg.header().ackno << ", winsize: " << seg.header().win;
+#endif
+
     }
 
     if (seg.header().syn) {
+
+#if DEBUG
+    cerr << ", stream start";
+#endif
+
         _is_stream_start = true;
     }
 
@@ -50,6 +64,10 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 
         _send(false);
     }
+
+#if DEBUG
+    cerr << endl;
+#endif
 
     _last_segment_received_time = _tick_time;
 }
@@ -70,10 +88,6 @@ size_t TCPConnection::write(const string &data) {
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) {
-#if DEBUG
-    cout << "ms_since_last_tick: " << ms_since_last_tick << ", _tick_time: " << _tick_time << endl;
-#endif
-
     _tick_time += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
     if (!_is_stream_start) {
@@ -91,7 +105,7 @@ void TCPConnection::end_input_stream() {
     }
 
 #if DEBUG
-    cout << "end_input_stream" << endl;
+    cerr << "end_input_stream" << endl;
 #endif
 
     _sender.stream_in().end_input();
@@ -139,7 +153,7 @@ void TCPConnection::_send(const bool set_rst) {
                                    : static_cast<uint16_t>(_receiver.window_size());
 
 #if DEBUG
-            cout << "win size: " << seg.header().win << endl;
+            cerr << "ackno: " << seg.header().ackno << ", win size: " << seg.header().win << endl;
 #endif
         }
 
@@ -147,7 +161,7 @@ void TCPConnection::_send(const bool set_rst) {
             // set rst and abort coneection
 
 #if DEBUG
-            cout << "_abort_conn, "
+            cerr << "_abort_conn, "
                  << "_sender.consecutive_retransmissions(): " << _sender.consecutive_retransmissions() << endl;
 #endif
 
