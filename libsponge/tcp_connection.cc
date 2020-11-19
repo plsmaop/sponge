@@ -70,7 +70,6 @@ size_t TCPConnection::write(const string &data) {
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) {
-
 #if DEBUG
     cout << "ms_since_last_tick: " << ms_since_last_tick << ", _tick_time: " << _tick_time << endl;
 #endif
@@ -100,7 +99,7 @@ void TCPConnection::end_input_stream() {
     _send(false);
 }
 
-void TCPConnection::connect() { 
+void TCPConnection::connect() {
     _is_stream_start = true;
     _sender.fill_window();
     _send(false);
@@ -136,20 +135,20 @@ void TCPConnection::_send(const bool set_rst) {
             seg.header().ack = true;
             seg.header().ackno = _receiver.ackno().value();
             seg.header().win = _receiver.window_size() > static_cast<uint64_t>(numeric_limits<uint16_t>::max())
-                                ? numeric_limits<uint16_t>::max()
-                                : static_cast<uint16_t>(_receiver.window_size());
+                                   ? numeric_limits<uint16_t>::max()
+                                   : static_cast<uint16_t>(_receiver.window_size());
 
 #if DEBUG
-    cout << "win size: " << seg.header().win << endl;
+            cout << "win size: " << seg.header().win << endl;
 #endif
-
         }
 
         if (set_rst || _sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
             // set rst and abort coneection
 
 #if DEBUG
-    cout << "_abort_conn, " << "_sender.consecutive_retransmissions(): " << _sender.consecutive_retransmissions() << endl;
+            cout << "_abort_conn, "
+                 << "_sender.consecutive_retransmissions(): " << _sender.consecutive_retransmissions() << endl;
 #endif
 
             _abort_conn();

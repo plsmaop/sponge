@@ -1,5 +1,4 @@
 #include "tcp_receiver.hh"
-#include <iostream>
 
 // Dummy implementation of a TCP receiver
 
