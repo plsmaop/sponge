@@ -183,6 +183,10 @@ void TCPConnection::_try_end_conn() {
         return;
     }
 
+    if (inbound_stream().eof() && !_sender.stream_in().eof()) {
+        _linger_after_streams_finish = false;
+    }
+
     if (!inbound_stream().eof() || !_is_fin_acked()) {
         return;
     }

@@ -27,7 +27,7 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     auto absolute_seqno = unwrap(_next_ackno.value(), _isn, _checkpoint);
     auto incoming_seqno = static_cast<uint64_t>(header.seqno.raw_value()) - static_cast<uint64_t>(_isn.raw_value());
     auto payload = seg.payload();
-    if (absolute_seqno + window_size() < incoming_seqno) {
+    if (incoming_seqno == 0 || absolute_seqno + window_size() < incoming_seqno) {
         return;
     }
 
@@ -35,7 +35,6 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     _reassembler.push_substring(payload.copy().substr(0, max_size), incoming_seqno - 1, header.fin);
     _checkpoint = _reassembler.stream_out().bytes_written();
 
-    using namespace std;
     for (uint64_t i = 0; i < payload.size() && i < max_size; ++i) {
         auto ind = static_cast<uint64_t>(header.seqno.raw_value()) + i;
         received_in_window[ind % _capacity] = true;
