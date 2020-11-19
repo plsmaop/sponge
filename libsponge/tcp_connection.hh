@@ -27,6 +27,8 @@ class TCPConnection {
 
     bool _is_conn_close{false};
 
+    bool _is_stream_start{false};
+
     void _send(const bool set_rst);
 
     void _abort_conn();

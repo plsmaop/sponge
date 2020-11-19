@@ -35,6 +35,15 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 
     if (seg.header().ack) {
         _sender.ack_received(seg.header().ackno, seg.header().win);
+
+#if DEBUG
+    cout << "received win size: " << seg.header().win << endl;
+#endif
+
+    }
+
+    if (seg.header().syn) {
+        _is_stream_start = true;
     }
 
     if (seg.length_in_sequence_space() > 0) {
@@ -57,7 +66,7 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 bool TCPConnection::active() const { return !_is_conn_close; }
 
 size_t TCPConnection::write(const string &data) {
-    if (!active()) {
+    if (!active() || !_is_stream_start) {
         return 0;
     }
 
@@ -77,6 +86,10 @@ void TCPConnection::tick(const size_t ms_since_last_tick) {
 
     _tick_time += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
+    if (!_is_stream_start) {
+        return;
+    }
+
     _sender.fill_window();
     _send(false);
     _try_end_conn();
@@ -102,6 +115,7 @@ void TCPConnection::end_input_stream() {
 }
 
 void TCPConnection::connect() { 
+    _is_stream_start = true;
     _sender.fill_window();
     _send(false);
 }
@@ -124,40 +138,31 @@ TCPConnection::~TCPConnection() {
 }
 
 void TCPConnection::_send(const bool set_rst) {
-    if (!active() || _sender.segments_out().empty()) {
-        return;
-    }
+    while (active() && !_sender.segments_out().empty()) {
+        auto seg = _sender.segments_out().front();
+        _sender.segments_out().pop();
 
-    auto seg = _sender.segments_out().front();
-    _sender.segments_out().pop();
-
-    if (_receiver.ackno().has_value()) {
+        if (_receiver.ackno().has_value()) {
 
 #if DEBUG
     cout << "_receiver.ackno().value(): " << _receiver.ackno().value() << endl;
 #endif
 
-        seg.header().ack = true;
-        seg.header().ackno = _receiver.ackno().value();
-        seg.header().win = _receiver.window_size() > static_cast<uint64_t>(numeric_limits<uint16_t>::max())
-                               ? numeric_limits<uint16_t>::max()
-                               : static_cast<uint16_t>(_receiver.window_size());
+            seg.header().ack = true;
+            seg.header().ackno = _receiver.ackno().value();
+            seg.header().win = _receiver.window_size() > static_cast<uint64_t>(numeric_limits<uint16_t>::max())
+                                ? numeric_limits<uint16_t>::max()
+                                : static_cast<uint16_t>(_receiver.window_size());
+        }
+
+        if (set_rst || _sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
+            // set rst and abort coneection
+            _abort_conn();
+            seg.header().rst = true;
+        }
+
+        _segments_out.push(seg);
     }
-
-    if (set_rst || _sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
-        // set rst and abort coneection
-        _abort_conn();
-        seg.header().rst = true;
-    }
-
-#if DEBUG
-    cout << "seg ackno: " << seg.header().ackno << endl;
-#endif
-
-    _segments_out.push(seg);
-#if DEBUG
-    cout << "_segments_out size: " << _segments_out.size() << ", front ackno: " << _segments_out.front().header().ackno << endl;
-#endif
 }
 
 void TCPConnection::_close_conn() {
