@@ -3,6 +3,8 @@
 #include <iostream>
 #include <limits>
 
+#define DEBUG 0
+
 // Dummy implementation of a TCP connection
 
 // For Lab 4, please replace with a real implementation that passes the
@@ -31,15 +33,25 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
         return;
     }
 
-    _receiver.segment_received(seg);
     if (seg.header().ack) {
         _sender.ack_received(seg.header().ackno, seg.header().win);
     }
 
     if (seg.length_in_sequence_space() > 0) {
+        _receiver.segment_received(seg);
+        _sender.fill_window();
+        if (_sender.segments_out().empty()) {
+            _sender.send_empty_segment();
+        }
+
         _send(false);
-        _last_segment_received_time = _tick_time;
     }
+
+    _last_segment_received_time = _tick_time;
+
+#if DEBUG
+    cout << "_last_segment_received_time = " << _last_segment_received_time << endl;
+#endif
 }
 
 bool TCPConnection::active() const { return !_is_conn_close; }
@@ -50,6 +62,7 @@ size_t TCPConnection::write(const string &data) {
     }
 
     auto written_bytes = _sender.stream_in().write(data);
+    _sender.fill_window();
     _send(false);
 
     return written_bytes;
@@ -57,21 +70,41 @@ size_t TCPConnection::write(const string &data) {
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) {
+
+#if DEBUG
+    cout << "ms_since_last_tick: " << ms_since_last_tick << ", _tick_time: " << _tick_time << endl;
+#endif
+
     _tick_time += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
+    _sender.fill_window();
     _send(false);
     _try_end_conn();
 }
 
 void TCPConnection::end_input_stream() {
     if (inbound_stream().eof() && !_sender.stream_in().eof()) {
+
+#if DEBUG
+    cout << "set _linger_after_streams_finish false and ";
+#endif
+
         _linger_after_streams_finish = false;
     }
 
-    _sender.stream_in().input_ended();
+#if DEBUG
+    cout << "end_input_stream" << endl;
+#endif
+
+    _sender.stream_in().end_input();
+    _sender.fill_window();
+    _send(false);
 }
 
-void TCPConnection::connect() { _send(false); }
+void TCPConnection::connect() { 
+    _sender.fill_window();
+    _send(false);
+}
 
 TCPConnection::~TCPConnection() {
     try {
@@ -79,6 +112,10 @@ TCPConnection::~TCPConnection() {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
 
             // Your code here: need to send a RST segment to the peer
+            _sender.fill_window();
+            if (_sender.segments_out().empty()) {
+                _sender.send_empty_segment();
+            }
             _send(true);
         }
     } catch (const exception &e) {
@@ -87,19 +124,19 @@ TCPConnection::~TCPConnection() {
 }
 
 void TCPConnection::_send(const bool set_rst) {
-    if (!active()) {
+    if (!active() || _sender.segments_out().empty()) {
         return;
-    }
-
-    _sender.fill_window();
-    if (_sender.segments_out().empty()) {
-        _sender.send_empty_segment();
     }
 
     auto seg = _sender.segments_out().front();
     _sender.segments_out().pop();
 
     if (_receiver.ackno().has_value()) {
+
+#if DEBUG
+    cout << "_receiver.ackno().value(): " << _receiver.ackno().value() << endl;
+#endif
+
         seg.header().ack = true;
         seg.header().ackno = _receiver.ackno().value();
         seg.header().win = _receiver.window_size() > static_cast<uint64_t>(numeric_limits<uint16_t>::max())
@@ -113,7 +150,14 @@ void TCPConnection::_send(const bool set_rst) {
         seg.header().rst = true;
     }
 
+#if DEBUG
+    cout << "seg ackno: " << seg.header().ackno << endl;
+#endif
+
     _segments_out.push(seg);
+#if DEBUG
+    cout << "_segments_out size: " << _segments_out.size() << ", front ackno: " << _segments_out.front().header().ackno << endl;
+#endif
 }
 
 void TCPConnection::_close_conn() {
@@ -146,7 +190,11 @@ void TCPConnection::_try_end_conn() {
     // Prereq #4
     // Option A
     if (_linger_after_streams_finish) {
-        if (time_since_last_segment_received() > 10 * _cfg.rt_timeout) {
+        if (time_since_last_segment_received() >= 10 * _cfg.rt_timeout) {
+
+#if DEBUG
+    cout << "time_since_last_segment_received: " << time_since_last_segment_received() << endl;
+#endif
             _close_conn();
         }
 
