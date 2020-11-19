@@ -57,6 +57,7 @@ void main_loop(const bool reorder) {
                 throw runtime_error("want = " + to_string(want) + ", written = " + to_string(written));
             }
             bytes_to_send.remove_prefix(written);
+            cout << "written: " << written << endl;
         }
 
         if (bytes_to_send.size() == 0 and not x_closed) {

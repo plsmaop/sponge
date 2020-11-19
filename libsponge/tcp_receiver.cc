@@ -34,24 +34,15 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
     auto max_size = absolute_seqno + window_size() - incoming_seqno;
     _reassembler.push_substring(payload.copy().substr(0, max_size), incoming_seqno - 1, header.fin);
 
-    for (uint64_t i = 0; i < payload.size() && i < max_size; ++i) {
-        decltype(incoming_seqno) ind = incoming_seqno + i;
-        received_in_window[ind % _capacity] = true;
-    }
-
-    if (header.fin && max_size >= payload.size()) {
-        received_in_window[(incoming_seqno + payload.size()) % _capacity] = true;
-    }
-
     // move window
     if (absolute_seqno >= incoming_seqno) {
-        auto ind = absolute_seqno;
-        while (received_in_window[ind % _capacity]) {
-            received_in_window[ind % _capacity] = false;
-            ++ind;
+        // +1 for syn
+        auto next_ackno = _reassembler.stream_out().bytes_written()+1;
+        if (_reassembler.stream_out().input_ended()) {
+            ++next_ackno;
         }
 
-        _next_ackno = wrap(ind, _isn);
+        _next_ackno = wrap(next_ackno, _isn);
     }
 }
 

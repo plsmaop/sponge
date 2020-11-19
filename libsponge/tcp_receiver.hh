@@ -22,14 +22,13 @@ class TCPReceiver {
     size_t _capacity;
     std::optional<WrappingInt32> _next_ackno = std::nullopt;
     WrappingInt32 _isn = WrappingInt32{0};
-    std::vector<bool> received_in_window;
 
   public:
     //! \brief Construct a TCP receiver
     //!
     //! \param capacity the maximum number of bytes that the receiver will
     //!                 store in its buffers at any give time.
-    TCPReceiver(const size_t capacity) : _reassembler(capacity), _capacity(capacity), received_in_window(capacity) {}
+    TCPReceiver(const size_t capacity) : _reassembler(capacity), _capacity(capacity) {}
 
     //! \name Accessors to provide feedback to the remote TCPSender
     //!@{

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <limits>
 
-#define DEBUG 1
+#define DEBUG 0
 
 // Dummy implementation of a TCP connection
 
