@@ -20,7 +20,6 @@ class TCPReceiver {
 
     //! The maximum number of bytes we'll store.
     size_t _capacity;
-    uint64_t _checkpoint = 0;
     std::optional<WrappingInt32> _next_ackno = std::nullopt;
     WrappingInt32 _isn = WrappingInt32{0};
     std::vector<bool> received_in_window;

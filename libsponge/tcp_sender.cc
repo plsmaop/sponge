@@ -93,8 +93,8 @@ void TCPSender::fill_window() {
             return;
         }
 
-        _segments_out.push(seg);
-        _outstanding.push_back(seg);
+        _segments_out.emplace(seg);
+        _outstanding.emplace_back(seg);
         _bytes_in_flight += static_cast<uint64_t>(seg.length_in_sequence_space());
         _next_seqno += static_cast<uint64_t>(seg.length_in_sequence_space());
         _timer.set_timeout(_initial_retransmission_timeout);
@@ -175,7 +175,7 @@ unsigned int TCPSender::consecutive_retransmissions() const { return _consecutiv
 void TCPSender::send_empty_segment() {
     TCPSegment seg;
     seg.header().seqno = next_seqno();
-    _segments_out.push(seg);
+    _segments_out.emplace(seg);
 }
 
 void TCPSender::_retransmit() {
@@ -189,7 +189,7 @@ void TCPSender::_retransmit() {
         return;
     }
 
-    _segments_out.push(*it);
+    _segments_out.emplace(*it);
 
     auto rto = _timer.get_timout();
     // (b)

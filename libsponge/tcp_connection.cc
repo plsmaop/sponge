@@ -35,11 +35,6 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 
     if (seg.header().ack) {
         _sender.ack_received(seg.header().ackno, seg.header().win);
-
-#if DEBUG
-    cout << "received win size: " << seg.header().win << endl;
-#endif
-
     }
 
     if (seg.header().syn) {
@@ -57,10 +52,6 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     }
 
     _last_segment_received_time = _tick_time;
-
-#if DEBUG
-    cout << "_last_segment_received_time = " << _last_segment_received_time << endl;
-#endif
 }
 
 bool TCPConnection::active() const { return !_is_conn_close; }
@@ -97,11 +88,6 @@ void TCPConnection::tick(const size_t ms_since_last_tick) {
 
 void TCPConnection::end_input_stream() {
     if (inbound_stream().eof() && !_sender.stream_in().eof()) {
-
-#if DEBUG
-    cout << "set _linger_after_streams_finish false and ";
-#endif
-
         _linger_after_streams_finish = false;
     }
 
@@ -138,30 +124,39 @@ TCPConnection::~TCPConnection() {
 }
 
 void TCPConnection::_send(const bool set_rst) {
-    while (active() && !_sender.segments_out().empty()) {
+    if (!active()) {
+        return;
+    }
+
+    while (!_sender.segments_out().empty()) {
         auto seg = _sender.segments_out().front();
         _sender.segments_out().pop();
 
         if (_receiver.ackno().has_value()) {
-
-#if DEBUG
-    cout << "_receiver.ackno().value(): " << _receiver.ackno().value() << endl;
-#endif
-
             seg.header().ack = true;
             seg.header().ackno = _receiver.ackno().value();
             seg.header().win = _receiver.window_size() > static_cast<uint64_t>(numeric_limits<uint16_t>::max())
                                 ? numeric_limits<uint16_t>::max()
                                 : static_cast<uint16_t>(_receiver.window_size());
+
+#if DEBUG
+    cout << "win size: " << seg.header().win << endl;
+#endif
+
         }
 
         if (set_rst || _sender.consecutive_retransmissions() > TCPConfig::MAX_RETX_ATTEMPTS) {
             // set rst and abort coneection
+
+#if DEBUG
+    cout << "_abort_conn, " << "_sender.consecutive_retransmissions(): " << _sender.consecutive_retransmissions() << endl;
+#endif
+
             _abort_conn();
             seg.header().rst = true;
         }
 
-        _segments_out.push(seg);
+        _segments_out.emplace(seg);
     }
 }
 
@@ -200,10 +195,6 @@ void TCPConnection::_try_end_conn() {
     // Option A
     if (_linger_after_streams_finish) {
         if (time_since_last_segment_received() >= 10 * _cfg.rt_timeout) {
-
-#if DEBUG
-    cout << "time_since_last_segment_received: " << time_since_last_segment_received() << endl;
-#endif
             _close_conn();
         }
 

@@ -1,4 +1,5 @@
 #include "tcp_receiver.hh"
+#include <iostream>
 
 // Dummy implementation of a TCP receiver
 
@@ -18,14 +19,14 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
 
     if (!_next_ackno) {
         _isn = header.seqno;
-        received_in_window[header.seqno.raw_value() % _capacity] = false;
         header.seqno = header.seqno + 1;
         _next_ackno = header.seqno;
     }
 
     // outside window
+    auto _checkpoint = _reassembler.stream_out().bytes_written();
     auto absolute_seqno = unwrap(_next_ackno.value(), _isn, _checkpoint);
-    auto incoming_seqno = static_cast<uint64_t>(header.seqno.raw_value()) - static_cast<uint64_t>(_isn.raw_value());
+    auto incoming_seqno = unwrap(header.seqno, _isn, _checkpoint);
     auto payload = seg.payload();
     if (incoming_seqno == 0 || absolute_seqno + window_size() < incoming_seqno) {
         return;
@@ -33,31 +34,25 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
 
     auto max_size = absolute_seqno + window_size() - incoming_seqno;
     _reassembler.push_substring(payload.copy().substr(0, max_size), incoming_seqno - 1, header.fin);
-    _checkpoint = _reassembler.stream_out().bytes_written();
 
     for (uint64_t i = 0; i < payload.size() && i < max_size; ++i) {
-        auto ind = static_cast<uint64_t>(header.seqno.raw_value()) + i;
+        decltype(incoming_seqno) ind = incoming_seqno + i;
         received_in_window[ind % _capacity] = true;
     }
 
     if (header.fin && max_size >= payload.size()) {
-        received_in_window[(static_cast<uint64_t>(header.seqno.raw_value()) + payload.size()) % _capacity] = true;
+        received_in_window[(incoming_seqno + payload.size()) % _capacity] = true;
     }
 
     // move window
-    if (_next_ackno == header.seqno) {
-        auto ind = static_cast<uint64_t>(_next_ackno.value().raw_value());
-        auto new_acked = 0;
-        while (true) {
-            if (!received_in_window[ind % _capacity]) {
-                break;
-            }
+    if (absolute_seqno >= incoming_seqno) {
+        auto ind = absolute_seqno;
+        while (received_in_window[ind % _capacity]) {
             received_in_window[ind % _capacity] = false;
             ++ind;
-            ++new_acked;
         }
 
-        _next_ackno = _next_ackno.value() + new_acked;
+        _next_ackno = wrap(ind, _isn);
     }
 }
 
