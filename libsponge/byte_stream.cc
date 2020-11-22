@@ -19,12 +19,21 @@ ByteStream::ByteStream(const size_t capacity) : _capacity(capacity), _buf(string
 
 size_t ByteStream::write(const string &data) {
     auto gap = remaining_capacity();
-    decltype(data.length()) ind = 0;
-    for (; ind < data.length() && ind < gap; ++ind, ++_producer_index) {
-        _buf[_producer_index % _capacity] = data[ind];
+    if (gap == 0) {
+        return 0;
     }
 
-    return ind;
+    auto byte_written = gap > data.length() ? data.length() : gap;
+    auto start = _producer_index % _capacity;
+    auto end = start + byte_written > _capacity ? _capacity : start + byte_written;
+
+    data.copy(_buf.data() + start, end - start, 0);
+    if (_capacity < start + byte_written) {
+        data.copy(_buf.data(), (start + byte_written) - _capacity, end - start);
+    }
+
+    _producer_index += byte_written;
+    return byte_written;
 }
 
 //! \param[in] len bytes will be copied from the output side of the buffer
@@ -34,9 +43,13 @@ string ByteStream::peek_output(const size_t len) const {
     }
 
     std::string s(len, ' ');
-    for (auto i = _consumer_index; i < _consumer_index + len; ++i) {
-        s[i - _consumer_index] = _buf[i % _capacity];
+    auto start = _consumer_index % _capacity;
+    auto end = start + len > _capacity ? _capacity : start + len;
+    _buf.copy(s.data(), end - start, start);
+    if (start + len > _capacity) {
+        _buf.copy(s.data() + (end - start), (start + len) - _capacity, 0);
     }
+
     return s;
 }
 
